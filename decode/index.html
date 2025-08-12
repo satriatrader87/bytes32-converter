@@ -1,79 +1,85 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>ABI Calldata Decoder Improved</title>
+<title>Extract extraArgs from calldata</title>
+<style>
+  body { font-family: monospace; padding: 20px; }
+  textarea { width: 100%; height: 120px; font-family: monospace; font-size: 14px; }
+  pre { background: #f0f0f0; padding: 10px; white-space: pre-wrap; word-break: break-all; }
+  button { margin-top: 10px; padding: 10px 20px; font-size: 16px; }
+</style>
 </head>
 <body>
-<h3>ABI Calldata Decoder with Dynamic Data</h3>
-<textarea id="inputHex" rows="10" cols="100" placeholder="Paste calldata hex here"></textarea><br><br>
-<button onclick="decodeABI()">Decode</button>
-<pre id="output"></pre>
+<h2>Extract extraArgs from calldata</h2>
+<p>Paste your calldata (without 0x prefix or with) in hex format below:</p>
+<textarea id="calldataInput" placeholder="Paste calldata hex here..."></textarea>
+<br />
+<button onclick="extractExtraArgs()">Extract extraArgs</button>
+<h3>Result:</h3>
+<pre id="result">Waiting for input...</pre>
 
 <script>
 function hexToBytes(hex) {
-    hex = hex.replace(/^0x/, '');
-    let bytes = [];
-    for (let i=0; i<hex.length; i+=2) {
-        bytes.push(parseInt(hex.substr(i,2),16));
-    }
-    return bytes;
+  hex = hex.startsWith('0x') ? hex.slice(2) : hex;
+  let bytes = [];
+  for (let i=0; i<hex.length; i+=2) {
+    bytes.push(parseInt(hex.substr(i,2),16));
+  }
+  return bytes;
 }
 
 function bytesToHex(bytes) {
-    return '0x' + bytes.map(b => b.toString(16).padStart(2,'0')).join('');
+  return '0x'+bytes.map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 
-function readUint256(bytes, start) {
-    return BigInt('0x'+bytes.slice(start,start+32).map(b => b.toString(16).padStart(2,'0')).join(''));
-}
-
-function decodeABI() {
-    const hex = document.getElementById('inputHex').value.trim();
-    if (!hex.startsWith('0x')) {
-        alert('Hex must start with 0x');
-        return;
-    }
-    const bytes = hexToBytes(hex);
-    if (bytes.length < 4) {
-        alert('Hex too short');
-        return;
-    }
-
-    const selector = bytes.slice(0,4);
-    const params = bytes.slice(4);
-    const paramCount = Math.floor(params.length / 32);
-
-    let out = `Function selector: ${bytesToHex(selector)}\n\nParameters:\n`;
-
-    // Threshold for offset detection: minimal offset 32 (start of params area)
-    const MIN_OFFSET = 32;
-
-    for(let i=0; i<paramCount; i++) {
-        const paramStart = i*32;
-        const paramBytes = params.slice(paramStart,paramStart+32);
-        const val = readUint256(params,paramStart);
-
-        // Check if value looks like offset to dynamic data inside params
-        if (val >= BigInt(MIN_OFFSET) && val < BigInt(params.length)) {
-            // Read length of dynamic data at offset
-            const offset = Number(val);
-            const len = Number(readUint256(params, offset));
-            const dataStart = offset + 32;
-            const dataEnd = dataStart + len;
-
-            if (dataEnd > params.length) {
-                out += `Param ${i}: Invalid dynamic data length or offset\n`;
-            } else {
-                const dataBytes = params.slice(dataStart, dataEnd);
-                out += `Param ${i} (dynamic data, offset ${offset}, length ${len}):\n  ${bytesToHex(dataBytes)}\n`;
-            }
-        } else {
-            // Treat as static uint256/address/bytes32
-            out += `Param ${i} (static): ${bytesToHex(paramBytes)}\n`;
-        }
-    }
-    document.getElementById('output').textContent = out;
+function extractExtraArgs() {
+  const calldataHex = document.getElementById('calldataInput').value.trim();
+  if(!calldataHex || calldataHex.length < 64) {
+    document.getElementById('result').textContent = "Input calldata is too short or empty.";
+    return;
+  }
+  
+  const bytes = hexToBytes(calldataHex);
+  
+  // Param ke-16, index start (16*32)
+  const paramIndex = 16;
+  const offsetPos = paramIndex * 32;
+  if(offsetPos + 32 > bytes.length) {
+    document.getElementById('result').textContent = "Calldata too short to read offset at param 16.";
+    return;
+  }
+  
+  // Baca offset (big endian)
+  let offset = 0;
+  for(let i=offsetPos; i<offsetPos+32; i++) {
+    offset = offset * 256 + bytes[i];
+  }
+  
+  if(offset === 0) {
+    document.getElementById('result').textContent = "Offset is zero, no extraArgs data.";
+    return;
+  }
+  
+  if(offset + 32 > bytes.length) {
+    document.getElementById('result').textContent = "Offset points outside calldata.";
+    return;
+  }
+  
+  // Baca panjang data dynamic di offset
+  let length = 0;
+  for(let i=offset; i<offset+32; i++) {
+    length = length * 256 + bytes[i];
+  }
+  
+  if(offset + 32 + length > bytes.length) {
+    document.getElementById('result').textContent = "Data length goes outside calldata.";
+    return;
+  }
+  
+  // Ambil data extraArgs
+  const data = bytes.slice(offset + 32, offset + 32 + length);
+  document.getElementById('result').textContent = "extraArgs:\n" + bytesToHex(data);
 }
 </script>
 </body>
