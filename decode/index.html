@@ -37,7 +37,8 @@ function extractExtraArgs() {
         return;
     }
 
-    let extraArgsBytes = bytes.slice(idx, idx + 32);
+    // Ambil 64 byte (32 byte data + 32 byte padding nol)
+    let extraArgsBytes = bytes.slice(idx, idx + 64);
     let extraArgsHex = "0x" + extraArgsBytes.map(b => b.toString(16).padStart(2, "0")).join("");
     document.getElementById("result").textContent = extraArgsHex;
 }
