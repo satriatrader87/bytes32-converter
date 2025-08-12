@@ -1,74 +1,79 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>Calldata Multi-field Decoder</title>
+<meta charset="UTF-8" />
+<title>ABI Calldata Decoder Improved</title>
 </head>
 <body>
-<h3>Calldata Multi-field Decoder</h3>
-<textarea id="inputHex" rows="8" cols="100" placeholder="Paste calldata hex here..."></textarea><br><br>
-<button onclick="decodeCalldata()">Decode</button>
+<h3>ABI Calldata Decoder with Dynamic Data</h3>
+<textarea id="inputHex" rows="10" cols="100" placeholder="Paste calldata hex here"></textarea><br><br>
+<button onclick="decodeABI()">Decode</button>
 <pre id="output"></pre>
 
 <script>
 function hexToBytes(hex) {
     hex = hex.replace(/^0x/, '');
     let bytes = [];
-    for (let c = 0; c < hex.length; c += 2) {
-        bytes.push(parseInt(hex.substr(c, 2), 16));
+    for (let i=0; i<hex.length; i+=2) {
+        bytes.push(parseInt(hex.substr(i,2),16));
     }
     return bytes;
 }
 
 function bytesToHex(bytes) {
-    return '0x' + bytes.map(b => b.toString(16).padStart(2, '0')).join('');
+    return '0x' + bytes.map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
 function readUint256(bytes, start) {
-    return BigInt('0x' + bytes.slice(start, start + 32).map(b => b.toString(16).padStart(2, '0')).join(''));
+    return BigInt('0x'+bytes.slice(start,start+32).map(b => b.toString(16).padStart(2,'0')).join(''));
 }
 
-function decodeCalldata() {
-    let hex = document.getElementById("inputHex").value.trim();
-    if (!hex.startsWith("0x")) {
-        alert("Hex must start with 0x");
+function decodeABI() {
+    const hex = document.getElementById('inputHex').value.trim();
+    if (!hex.startsWith('0x')) {
+        alert('Hex must start with 0x');
+        return;
+    }
+    const bytes = hexToBytes(hex);
+    if (bytes.length < 4) {
+        alert('Hex too short');
         return;
     }
 
-    let bytes = hexToBytes(hex);
-    let selector = bytes.slice(0, 4);
-    let params = bytes.slice(4);
+    const selector = bytes.slice(0,4);
+    const params = bytes.slice(4);
+    const paramCount = Math.floor(params.length / 32);
 
-    let output = `Function selector: ${bytesToHex(selector)}\n\nParameters:\n`;
+    let out = `Function selector: ${bytesToHex(selector)}\n\nParameters:\n`;
 
-    // hitung jumlah slot parameter (anggap setiap param 32 byte di awal)
-    let numParams = Math.floor(params.length / 32);
-    let offsetsToDecode = [];
+    // Threshold for offset detection: minimal offset 32 (start of params area)
+    const MIN_OFFSET = 32;
 
-    for (let i = 0; i < numParams; i++) {
-        let paramBytes = params.slice(i * 32, (i + 1) * 32);
-        let asNumber = readUint256(params, i * 32);
+    for(let i=0; i<paramCount; i++) {
+        const paramStart = i*32;
+        const paramBytes = params.slice(paramStart,paramStart+32);
+        const val = readUint256(params,paramStart);
 
-        // cek apakah ini offset ke data dinamis
-        if (asNumber > 0 && asNumber < params.length) {
-            output += `Param ${i} (offset to dynamic data): ${asNumber}\n`;
-            offsetsToDecode.push({ index: i, offset: Number(asNumber) });
+        // Check if value looks like offset to dynamic data inside params
+        if (val >= BigInt(MIN_OFFSET) && val < BigInt(params.length)) {
+            // Read length of dynamic data at offset
+            const offset = Number(val);
+            const len = Number(readUint256(params, offset));
+            const dataStart = offset + 32;
+            const dataEnd = dataStart + len;
+
+            if (dataEnd > params.length) {
+                out += `Param ${i}: Invalid dynamic data length or offset\n`;
+            } else {
+                const dataBytes = params.slice(dataStart, dataEnd);
+                out += `Param ${i} (dynamic data, offset ${offset}, length ${len}):\n  ${bytesToHex(dataBytes)}\n`;
+            }
         } else {
-            output += `Param ${i} (static value): ${bytesToHex(paramBytes)}\n`;
+            // Treat as static uint256/address/bytes32
+            out += `Param ${i} (static): ${bytesToHex(paramBytes)}\n`;
         }
     }
-
-    output += `\nDynamic Data:\n`;
-    offsetsToDecode.forEach(({ index, offset }) => {
-        let length = Number(readUint256(params, offset));
-        let dataStart = offset + 32;
-        let dataEnd = dataStart + length;
-        let dataBytes = params.slice(dataStart, dataEnd);
-        output += `Param ${index} length: ${length}\n`;
-        output += `Param ${index} data: ${bytesToHex(dataBytes)}\n\n`;
-    });
-
-    document.getElementById("output").textContent = output;
+    document.getElementById('output').textContent = out;
 }
 </script>
 </body>
