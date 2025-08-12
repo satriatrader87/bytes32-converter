@@ -1,105 +1,108 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Bytes Converter</title>
-  <style>
-    body { font-family: Arial, sans-serif; max-width: 800px; margin: auto; padding: 20px; }
-    h2 { margin-top: 30px; }
-    textarea, input { width: 100%; padding: 10px; margin-top: 5px; margin-bottom: 10px; font-size: 14px; }
-    button { padding: 10px 15px; font-size: 14px; cursor: pointer; margin: 5px 0; }
-    .section { border: 1px solid #ccc; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
-  </style>
+<meta charset="UTF-8">
+<title>Base64 ⇆ Bytes ⇆ Decimal ⇆ Bytes32 Converter</title>
+<style>
+    body { font-family: monospace; padding: 20px; background: #f4f4f4; }
+    textarea, input { width: 100%; padding: 8px; margin: 6px 0; font-family: monospace; }
+    button { padding: 8px 16px; margin: 4px 0; }
+</style>
 </head>
 <body>
 
-<h1>Bytes & Base64 Converter</h1>
+<h2>Base64 ⇆ Bytes ⇆ Decimal ⇆ Bytes32 Converter</h2>
 
-<div class="section">
-  <h2>Base64 ⇄ Bytes</h2>
-  <label>Base64 Input:</label>
-  <input type="text" id="base64Input">
-  <button onclick="base64ToBytes()">Base64 → Bytes (0x)</button>
-  
-  <label>Bytes Input (0x...):</label>
-  <input type="text" id="bytesInput">
-  <button onclick="bytesToBase64()">Bytes → Base64</button>
-  
-  <label>Output:</label>
-  <textarea id="output1" readonly></textarea>
-</div>
+<label>Base64:</label>
+<textarea id="base64"></textarea>
 
-<div class="section">
-  <h2>Decimal Array ⇄ Bytes32</h2>
-  <label>Decimal Array Input:</label>
-  <textarea id="decimalInput" placeholder="[0,0,0,...]"></textarea>
-  <button onclick="decimalToBytes32()">Decimal → Bytes32 (0x)</button>
-  
-  <label>Bytes32 Input (0x...):</label>
-  <input type="text" id="bytes32Input">
-  <button onclick="bytes32ToDecimal()">Bytes32 → Decimal Array</button>
-  
-  <label>Output:</label>
-  <textarea id="output2" readonly></textarea>
+<label>Bytes:</label>
+<textarea id="bytes"></textarea>
+
+<label>Decimal Array:</label>
+<textarea id="decimal"></textarea>
+
+<label>Bytes32 (0x...):</label>
+<input id="bytes32" />
+
+<div>
+    <button onclick="base64ToBytes()">Base64 → Bytes</button>
+    <button onclick="bytesToBase64()">Bytes → Base64</button>
+    <button onclick="decimalToBytes32()">Decimal → Bytes32</button>
+    <button onclick="bytes32ToDecimal()">Bytes32 → Decimal</button>
 </div>
 
 <script>
 function base64ToBytes() {
-  try {
-    const b64 = document.getElementById("base64Input").value.trim();
-    if (!b64) throw "Empty input";
-    const bytes = atob(b64).split('').map(c => c.charCodeAt(0));
-    document.getElementById("output1").value = "0x" + bytes.map(b => b.toString(16).padStart(2, '0')).join('');
-  } catch (e) {
-    document.getElementById("output1").value = "Invalid Base64";
-  }
+    try {
+        let b64 = document.getElementById('base64').value.trim();
+        if (!b64) return;
+        let bin = atob(b64);
+        let bytes = [];
+        for (let i = 0; i < bin.length; i++) {
+            bytes.push(bin.charCodeAt(i));
+        }
+        document.getElementById('bytes').value = '0x' + bytes.map(b => b.toString(16).padStart(2, '0')).join('');
+        document.getElementById('decimal').value = JSON.stringify(bytes);
+    } catch (e) {
+        alert("Error decoding Base64: " + e.message);
+    }
 }
 
 function bytesToBase64() {
-  try {
-    let hex = document.getElementById("bytesInput").value.trim();
-    if (!hex) throw "Empty input";
-    if (hex.startsWith("0x")) hex = hex.slice(2);
-    if (!/^[0-9a-fA-F]+$/.test(hex) || hex.length % 2 !== 0) throw "Invalid hex";
-    const bytes = new Uint8Array(hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
-    let binary = '';
-    bytes.forEach(b => binary += String.fromCharCode(b));
-    document.getElementById("output1").value = btoa(binary);
-  } catch (e) {
-    document.getElementById("output1").value = "Invalid Bytes";
-  }
+    try {
+        let hex = document.getElementById('bytes').value.trim().replace(/^0x/, '');
+        if (!/^[0-9a-fA-F]*$/.test(hex) || hex.length % 2 !== 0) {
+            alert("Invalid hex input.");
+            return;
+        }
+        let bin = '';
+        for (let i = 0; i < hex.length; i += 2) {
+            bin += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
+        }
+        document.getElementById('base64').value = btoa(bin);
+    } catch (e) {
+        alert("Error encoding to Base64: " + e.message);
+    }
 }
 
 function decimalToBytes32() {
-  try {
-    const val = document.getElementById("decimalInput").value.trim();
-    if (!val) throw "Empty input";
-    const arr = JSON.parse(val);
-    if (!Array.isArray(arr) || arr.length !== 32) throw "Array must be length 32";
-    const hex = arr.map(b => {
-      if (typeof b !== 'number' || b < 0 || b > 255) throw "Invalid byte value";
-      return b.toString(16).padStart(2, '0');
-    }).join('');
-    document.getElementById("output2").value = "0x" + hex;
-  } catch (e) {
-    document.getElementById("output2").value = "Invalid Decimal Array";
-  }
+    try {
+        let decArray = JSON.parse(document.getElementById('decimal').value);
+        if (!Array.isArray(decArray)) {
+            alert("Decimal input must be an array.");
+            return;
+        }
+        if (decArray.some(n => n < 0 || n > 255)) {
+            alert("Decimal values must be between 0 and 255.");
+            return;
+        }
+        while (decArray.length < 32) decArray.unshift(0);
+        if (decArray.length > 32) decArray = decArray.slice(-32);
+        let hex = decArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        document.getElementById('bytes32').value = '0x' + hex;
+        document.getElementById('bytes').value = '0x' + hex;
+    } catch (e) {
+        alert("Error converting Decimal to Bytes32: " + e.message);
+    }
 }
 
 function bytes32ToDecimal() {
-  try {
-    let hex = document.getElementById("bytes32Input").value.trim();
-    if (!hex) throw "Empty input";
-    if (hex.startsWith("0x")) hex = hex.slice(2);
-    if (!/^[0-9a-fA-F]+$/.test(hex) || hex.length !== 64) throw "Must be 32 bytes";
-    const arr = [];
-    for (let i = 0; i < hex.length; i += 2) {
-      arr.push(parseInt(hex.substr(i, 2), 16));
+    try {
+        let hex = document.getElementById('bytes32').value.trim().replace(/^0x/, '');
+        if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
+            alert("Bytes32 must be exactly 64 hex characters.");
+            return;
+        }
+        let arr = [];
+        for (let i = 0; i < hex.length; i += 2) {
+            arr.push(parseInt(hex.substr(i, 2), 16));
+        }
+        document.getElementById('decimal').value = JSON.stringify(arr);
+        document.getElementById('bytes').value = '0x' + hex;
+    } catch (e) {
+        alert("Error converting Bytes32 to Decimal: " + e.message);
     }
-    document.getElementById("output2").value = JSON.stringify(arr);
-  } catch (e) {
-    document.getElementById("output2").value = "Invalid Bytes32";
-  }
 }
 </script>
 
