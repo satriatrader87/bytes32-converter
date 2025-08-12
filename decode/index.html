@@ -1,85 +1,45 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8" />
-<title>Extract extraArgs from calldata</title>
-<style>
-  body { font-family: monospace; padding: 20px; }
-  textarea { width: 100%; height: 120px; font-family: monospace; font-size: 14px; }
-  pre { background: #f0f0f0; padding: 10px; white-space: pre-wrap; word-break: break-all; }
-  button { margin-top: 10px; padding: 10px 20px; font-size: 16px; }
-</style>
+<meta charset="UTF-8">
+<title>Extract extraArgs</title>
 </head>
 <body>
-<h2>Extract extraArgs from calldata</h2>
-<p>Paste your calldata (without 0x prefix or with) in hex format below:</p>
-<textarea id="calldataInput" placeholder="Paste calldata hex here..."></textarea>
-<br />
-<button onclick="extractExtraArgs()">Extract extraArgs</button>
-<h3>Result:</h3>
-<pre id="result">Waiting for input...</pre>
+<h3>Extract extraArgs from Calldata</h3>
+<textarea id="calldata" rows="6" cols="90" placeholder="Paste your calldata here..."></textarea><br><br>
+<button onclick="extractExtraArgs()">Extract</button>
+<p><strong>extraArgs:</strong> <span id="result"></span></p>
 
 <script>
-function hexToBytes(hex) {
-  hex = hex.startsWith('0x') ? hex.slice(2) : hex;
-  let bytes = [];
-  for (let i=0; i<hex.length; i+=2) {
-    bytes.push(parseInt(hex.substr(i,2),16));
-  }
-  return bytes;
-}
-
-function bytesToHex(bytes) {
-  return '0x'+bytes.map(b=>b.toString(16).padStart(2,'0')).join('');
-}
-
 function extractExtraArgs() {
-  const calldataHex = document.getElementById('calldataInput').value.trim();
-  if(!calldataHex || calldataHex.length < 64) {
-    document.getElementById('result').textContent = "Input calldata is too short or empty.";
-    return;
-  }
-  
-  const bytes = hexToBytes(calldataHex);
-  
-  // Param ke-16, index start (16*32)
-  const paramIndex = 16;
-  const offsetPos = paramIndex * 32;
-  if(offsetPos + 32 > bytes.length) {
-    document.getElementById('result').textContent = "Calldata too short to read offset at param 16.";
-    return;
-  }
-  
-  // Baca offset (big endian)
-  let offset = 0;
-  for(let i=offsetPos; i<offsetPos+32; i++) {
-    offset = offset * 256 + bytes[i];
-  }
-  
-  if(offset === 0) {
-    document.getElementById('result').textContent = "Offset is zero, no extraArgs data.";
-    return;
-  }
-  
-  if(offset + 32 > bytes.length) {
-    document.getElementById('result').textContent = "Offset points outside calldata.";
-    return;
-  }
-  
-  // Baca panjang data dynamic di offset
-  let length = 0;
-  for(let i=offset; i<offset+32; i++) {
-    length = length * 256 + bytes[i];
-  }
-  
-  if(offset + 32 + length > bytes.length) {
-    document.getElementById('result').textContent = "Data length goes outside calldata.";
-    return;
-  }
-  
-  // Ambil data extraArgs
-  const data = bytes.slice(offset + 32, offset + 32 + length);
-  document.getElementById('result').textContent = "extraArgs:\n" + bytesToHex(data);
+    let hex = document.getElementById("calldata").value.trim();
+
+    // Hilangkan 0x kalau ada
+    if (hex.startsWith("0x")) hex = hex.slice(2);
+
+    // Ubah ke array byte
+    let bytes = [];
+    for (let i = 0; i < hex.length; i += 2) {
+        bytes.push(parseInt(hex.substr(i, 2), 16));
+    }
+
+    // Cari pola 0x00 12 lalu ambil 32 byte setelahnya
+    let idx = -1;
+    for (let i = 0; i < bytes.length - 2; i++) {
+        if (bytes[i] === 0x00 && bytes[i + 1] === 0x12) {
+            idx = i + 2;
+            break;
+        }
+    }
+
+    if (idx === -1) {
+        document.getElementById("result").textContent = "extraArgs tidak ditemukan";
+        return;
+    }
+
+    let extraArgsBytes = bytes.slice(idx, idx + 32);
+    let extraArgsHex = "0x" + extraArgsBytes.map(b => b.toString(16).padStart(2, "0")).join("");
+    document.getElementById("result").textContent = extraArgsHex;
 }
 </script>
 </body>
