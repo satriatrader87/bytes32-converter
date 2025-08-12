@@ -47,9 +47,10 @@
 function base64ToBytes() {
   try {
     const b64 = document.getElementById("base64Input").value.trim();
+    if (!b64) return document.getElementById("output1").value = "No input";
     const bytes = atob(b64).split('').map(c => c.charCodeAt(0));
     document.getElementById("output1").value = "0x" + bytes.map(b => b.toString(16).padStart(2, '0')).join('');
-  } catch (e) {
+  } catch {
     document.getElementById("output1").value = "Invalid Base64";
   }
 }
@@ -57,23 +58,27 @@ function base64ToBytes() {
 function bytesToBase64() {
   try {
     let hex = document.getElementById("bytesInput").value.trim();
+    if (!hex) return document.getElementById("output1").value = "No input";
     if (hex.startsWith("0x")) hex = hex.slice(2);
+    if (!/^[0-9a-fA-F]+$/.test(hex)) return document.getElementById("output1").value = "Invalid hex";
     const bytes = new Uint8Array(hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
     let binary = '';
     bytes.forEach(b => binary += String.fromCharCode(b));
     document.getElementById("output1").value = btoa(binary);
-  } catch (e) {
+  } catch {
     document.getElementById("output1").value = "Invalid Bytes";
   }
 }
 
 function decimalToBytes32() {
   try {
-    const arr = JSON.parse(document.getElementById("decimalInput").value.trim());
-    if (!Array.isArray(arr) || arr.length !== 32) throw "Array must be length 32";
+    const raw = document.getElementById("decimalInput").value.trim();
+    if (!raw) return document.getElementById("output2").value = "No input";
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr) || arr.length !== 32) return document.getElementById("output2").value = "Array must have 32 numbers";
     const hex = arr.map(b => b.toString(16).padStart(2, '0')).join('');
     document.getElementById("output2").value = "0x" + hex;
-  } catch (e) {
+  } catch {
     document.getElementById("output2").value = "Invalid Decimal Array";
   }
 }
@@ -81,14 +86,15 @@ function decimalToBytes32() {
 function bytes32ToDecimal() {
   try {
     let hex = document.getElementById("bytes32Input").value.trim();
+    if (!hex) return document.getElementById("output2").value = "No input";
     if (hex.startsWith("0x")) hex = hex.slice(2);
-    if (hex.length !== 64) throw "Must be 32 bytes";
+    if (hex.length !== 64) return document.getElementById("output2").value = "Must be 32 bytes (64 hex chars)";
     const arr = [];
     for (let i = 0; i < hex.length; i += 2) {
       arr.push(parseInt(hex.substr(i, 2), 16));
     }
     document.getElementById("output2").value = JSON.stringify(arr);
-  } catch (e) {
+  } catch {
     document.getElementById("output2").value = "Invalid Bytes32";
   }
 }
