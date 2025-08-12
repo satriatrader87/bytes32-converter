@@ -20,7 +20,7 @@ Sebuah alat berbasis web sederhana untuk melakukan konversi antara format data:
 1. Buat repository baru di GitHub.
 2. Upload `index.html`, `README.md`, dan `LICENSE`.
 3. Aktifkan GitHub Pages di Settings → Pages → Branch → `(main)` → root (`/`).
-4. Akses di `https://<username>.github.io/<repo>/` contoh `https://satriatrader87.github.io/bytes32-converter/`.
+4. Akses di `https://<username>.github.io/<repo>/` contoh https://satriatrader87.github.io/bytes32-converter .
 
 ## Lisensi
 Proyek ini menggunakan lisensi MIT. Lihat file [LICENSE](LICENSE) untuk detail.
